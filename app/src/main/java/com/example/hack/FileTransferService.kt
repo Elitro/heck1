@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.io.File
 import java.io.FileInputStream
@@ -17,8 +18,8 @@ import java.net.Socket
 class FileTransferService : Service() {
 
     private val CHANNEL_ID = "FileTransferServiceChannel"
-    private val SERVER_IP = "192.168.1.4" // Server IP address
-    private val SERVER_PORT = 8080 // Server port number
+    private val SERVER_IP = "192.168.236.32" // Updated server IP address
+    private val SERVER_PORT = 8080 // Updated server port
 
     override fun onCreate() {
         super.onCreate()
@@ -27,18 +28,31 @@ class FileTransferService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val directoryPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath + "/Camera/"
+        val directoryPath = "/storage/emulated/0/DCIM/Camera" // Updated file path
         val directory = File(directoryPath)
+
         if (directory.exists() && directory.isDirectory) {
             val files = directory.listFiles()
-            if (files != null) {
+            if (files != null && files.isNotEmpty()) {
                 Thread {
                     files.forEach { file ->
-                        transferFile(file)
+                        try {
+                            transferFile(file)
+                        } catch (e: Exception) {
+                            // Handle exceptions appropriately, such as logging
+                            e.printStackTrace()
+                        }
                     }
                 }.start()
+            } else {
+                // Handle the case where no files are found in the directory
+                Log.e("FileTransferService", "File not found")
             }
+        } else {
+            // Handle the case where the directory does not exist or is not a directory
+            Log.e("FileTransferService", "Directory does not exist or is not a directory")
         }
+
         return START_NOT_STICKY
     }
 
@@ -70,6 +84,9 @@ class FileTransferService : Service() {
         try {
             val socket = Socket(SERVER_IP, SERVER_PORT)
             val outputStream: OutputStream = socket.getOutputStream()
+
+            // Print "CONNECTED" when the devices are connected
+            Log.i("FileTransferService", "CONNECTED")
 
             val fileDetails = "${file.name}<SEPARATOR>${file.length()}"
             outputStream.write(fileDetails.toByteArray())
