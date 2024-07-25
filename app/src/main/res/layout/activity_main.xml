@@ -1,14 +1,15 @@
+<!-- res/layout/activity_main.xml -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    android:layout_height="match_parent">
 
     <Button
-        android:id="@+id/transferButton"
+        android:id="@+id/startButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Click here to see nudes"
-        android:layout_centerInParent="true" />
+        android:text="Start File Transfer"
+        android:layout_centerInParent="true"/>
+
+    <!-- Other views -->
 
 </RelativeLayout>
